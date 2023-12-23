@@ -1,8 +1,9 @@
-package project;
+package project.enums;
 
 public enum GameState {
     ALIVE,
     LOST,
-    START
+    START,
+    LEARNING
 
 }

@@ -1,5 +1,8 @@
 package project;
 
+import project.enums.GameState;
+import project.enums.ModelState;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
@@ -9,9 +12,10 @@ public class Screen extends JFrame {
 
     Sandbox sandbox;
 
+
     Screen(int xGridSize, int yGridSize, int unitPixelSize) {
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        this.sandbox = new Sandbox(xGridSize, yGridSize, unitPixelSize);
+        this.sandbox = new Sandbox(xGridSize, yGridSize, unitPixelSize, ModelState.LEARNING);
         this.add(sandbox);
         this.pack();
         this.setLocationRelativeTo(null);
@@ -19,7 +23,7 @@ public class Screen extends JFrame {
     }
 
     public static void main(String[] args) {
-        Screen screen = new Screen(17, 17, 32);
+        Screen screen = new Screen(16, 16, 20);
 
     }
 

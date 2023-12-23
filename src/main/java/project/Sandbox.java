@@ -1,14 +1,19 @@
 package project;
 
+import project.enums.Action;
+import project.enums.GameState;
+import project.enums.ModelState;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Random;
 
 public class Sandbox extends JPanel implements KeyListener {
+
+    private static final char DEFAULT_APPLE_CHAR = 'A';
 
     int xGridSize;
 
@@ -24,19 +29,30 @@ public class Sandbox extends JPanel implements KeyListener {
 
     Snake snake;
 
+    int snakeSpeed;
+
     int xApple;
 
     int yApple;
 
     GameState gameState;
 
-    int t = 5;
+    Random appleCoordinateGen = new Random();
 
-    public Sandbox(int xGridSize, int yGridSize, int unitPixelSize) {
+    JLabel highScoreComponent;
+
+    JLabel currentScoreComponent;
+
+    JPanel panel;
+
+
+    public Sandbox(int xGridSize, int yGridSize, int unitPixelSize, ModelState modelState) {
 
         this.addKeyListener(this);
         this.setFocusable(true);
         this.requestFocusInWindow();
+
+        this.gameState = GameState.START;
 
         this.xGridSize = xGridSize;
         this.yGridSize = yGridSize;
@@ -44,13 +60,34 @@ public class Sandbox extends JPanel implements KeyListener {
         this.grid = new char[xGridSize][yGridSize];
         Arrays.stream(grid).forEach(a -> Arrays.fill(a, ' '));
 
-        this.snake = new Snake(this.xGridSize, this.yGridSize, unitPixelSize, this.grid);
+        if (modelState == ModelState.LEARNING) {
+            this.snakeSpeed = unitPixelSize;
+        } else
+            this.snakeSpeed = Snake.DEFAULT_SPEED_FACTOR;
+
+        this.snake = new Snake(this.xGridSize, this.yGridSize, this.snakeSpeed, unitPixelSize, this.grid);
+
 
         this.spawnNewApple();
 
         this.setPreferredSize(new Dimension(xGridSize * unitPixelSize, yGridSize * unitPixelSize));
         this.setBackground(Color.black);
-        this.gameState = GameState.ALIVE;
+
+        panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+
+
+        this.highScoreComponent = new JLabel("High Score: " + this.highScore);
+        this.highScoreComponent.setFont(new Font("SansSerif", Font.BOLD, 16));
+        this.highScoreComponent.setForeground(Color.WHITE);
+
+        this.currentScoreComponent = new JLabel("Current Score: " + this.score);
+        this.currentScoreComponent.setFont(new Font("SansSerif", Font.BOLD, 16));
+        this.currentScoreComponent.setForeground(Color.WHITE);
+        panel.add(currentScoreComponent);
+        panel.add(highScoreComponent);
+        panel.setBackground(new Color(Color.TRANSLUCENT));
+        this.add(panel, BorderLayout.LINE_START);
 
     }
 
@@ -64,37 +101,59 @@ public class Sandbox extends JPanel implements KeyListener {
         this.drawSnake(g2D);
         this.drawApple(g2D);
 
-        if (!this.snake.turns.isEmpty()) {
+        if (this.gameState == GameState.ALIVE) {
 
-            if ((this.snake.yCoordinate % unitPixelSize) == 0 && this.snake.xCoordinate % unitPixelSize == 0) {
-                this.snake.turn(this.snake.turns.poll());
+            if (this.appleEaten()) {
+                this.score += 1;
+                this.spawnNewApple();
+                this.snake.grow();
+                this.currentScoreComponent.setText("Current Score: " + this.score);
+                if (this.score > highScore) {
+                    this.highScore = this.score;
+                    this.highScoreComponent.setText("High Score: " + this.highScore);
+                }
             }
-        }
-        this.snake.updateCoordinates();
+            if (!this.snake.turns.isEmpty()) {
 
-        if (this.appleEaten()) {
-            this.score+=1;
-            this.spawnNewApple();
-            this.snake.grow();
-        }
+                if ((this.snake.yCoordinate % unitPixelSize) == 0 && this.snake.xCoordinate % unitPixelSize == 0) {
+                    this.snake.turn(this.snake.turns.poll());
+                }
+            }
+            this.snake.updateCoordinates();
 
-        if (this.snake.hitWall()) {
-            this.restartGame();
+
+            if (this.snake.lostGame()) {
+                this.restartGame();
+            }
         }
 
         //this.isTouchingBorder();
+        printGrid();
         this.repaint();
     }
 
     private void restartGame() {
         this.grid = new char[xGridSize][yGridSize];
-        this.snake = new Snake(this.xGridSize, this.yGridSize, this.unitPixelSize, this.grid);
-        this.highScore = Math.max(this.score, this.highScore);
+        Arrays.stream(grid).forEach(a -> Arrays.fill(a, ' '));
+        this.snake = new Snake(this.xGridSize, this.yGridSize, this.snakeSpeed, this.unitPixelSize, this.grid);
         this.spawnNewApple();
         this.score = 0;
+        this.currentScoreComponent.setText("Current Score: 0");
+        this.gameState = GameState.START;
     }
 
+    private void printGrid() {
+        StringBuilder s = new StringBuilder();
+        for (int i = 0; i < grid[0].length; i++) {
+            s.append(',');
+            for (char[] chars : grid) {
+                s.append((chars[i])).append(',');
+            }
+            s.append('\n');
+        }
+        System.out.println(s);
 
+}
 
     private void drawGrid(Graphics2D g2D, Color gridLineColor) {
         int gridSize = this.xGridSize * this.yGridSize;
@@ -132,12 +191,17 @@ public class Sandbox extends JPanel implements KeyListener {
     }
 
     private void spawnNewApple() {
-        Random r = new Random();
-        this.grid[xApple][yApple] = ' ';
-        this.xApple = r.nextInt(0, xGridSize);
-        this.yApple = r.nextInt(0, yGridSize);
-        this.grid[xApple][yApple] = 'X';
-
+        while (true) {
+            int newXApple = appleCoordinateGen.nextInt(0, xGridSize);
+            int newYApple = appleCoordinateGen.nextInt(0, yGridSize);
+            if (this.grid[newXApple][newYApple] == ' ') {
+                this.grid[xApple][yApple] = ' ';
+                this.grid[newXApple][newYApple] = DEFAULT_APPLE_CHAR;
+                this.xApple = newXApple;
+                this.yApple = newYApple;
+                return;
+            }
+        }
     }
 
     private boolean appleEaten() {
@@ -151,7 +215,17 @@ public class Sandbox extends JPanel implements KeyListener {
     @Override
     public void keyPressed(KeyEvent e) {
 
-        Direction direction = getDirectionOnKey(e);
+        project.enums.Action direction = getDirectionOnKey(e);
+
+        if (this.gameState == GameState.START) {
+            this.snake.snakeInit(direction);
+            this.gameState = GameState.ALIVE;
+            return;
+        }
+
+        if (this.snake.turns.size() == Snake.TURN_QUEUE_SIZE) {
+            return;
+        }
 
         if (!this.snake.turns.isEmpty()) {
 
@@ -166,19 +240,19 @@ public class Sandbox extends JPanel implements KeyListener {
 
     }
 
-    private Direction getDirectionOnKey(KeyEvent e) {
+    private project.enums.Action getDirectionOnKey(KeyEvent e) {
         if (e.getKeyCode() >= 37 && e.getKeyCode() <= 40) {
             if (e.getKeyCode() == KeyEvent.VK_UP) {
-                return Direction.UP;
+                return project.enums.Action.UP;
             }
             else if (e.getKeyCode() == KeyEvent.VK_RIGHT) {
-                return Direction.RIGHT;
+                return project.enums.Action.RIGHT;
             }
             else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
-                return Direction.DOWN;
+                return project.enums.Action.DOWN;
             }
             else if (e.getKeyCode() == KeyEvent.VK_LEFT) {
-                return Direction.LEFT;
+                return Action.LEFT;
             }
         }
         return this.snake.direction;
